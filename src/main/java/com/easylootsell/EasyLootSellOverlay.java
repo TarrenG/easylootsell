@@ -1,10 +1,7 @@
 package com.easylootsell;
 import net.runelite.api.Client;
-import net.runelite.api.InventoryID;
-import net.runelite.api.ItemContainer;
 import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.Widget;
-import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.api.widgets.WidgetItem;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.overlay.WidgetItemOverlay;
@@ -50,7 +47,7 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
 
     private boolean checkInterfaceIsHighlightable()
     {
-            Widget bankWidget = client.getWidget(WidgetInfo.BANK_ITEM_CONTAINER);
+            Widget bankWidget = client.getWidget(ComponentID.BANK_ITEM_CONTAINER);
             if (bankWidget != null)
             {
                 String bankTitle = client.getWidget(ComponentID.BANK_TITLE_BAR).getText();
