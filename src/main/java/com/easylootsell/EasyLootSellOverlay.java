@@ -31,7 +31,7 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
     @Override
     public void renderItemOverlay(Graphics2D graphics, int itemId, WidgetItem itemWidget)
     {
-        if (checkInterfaceIsHighlightable()) {
+        if (checkInterfaceIsHighlightable(itemWidget)) {
             int qty = itemWidget.getQuantity();
             /* highlight item if we have at least 1 in the loot tab for easy identification when selling */
             if (qty >= 1)
@@ -45,7 +45,7 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
         }
     }
 
-    private boolean checkInterfaceIsHighlightable()
+    private boolean checkInterfaceIsHighlightable(WidgetItem itemWidget)
     {
             Widget bankWidget = client.getWidget(ComponentID.BANK_ITEM_CONTAINER);
             if (bankWidget != null)
@@ -53,12 +53,13 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
                 String bankTitle = client.getWidget(ComponentID.BANK_TITLE_BAR).getText();
                 /* if the item is within the desired tab, it should be highlighted */
 
-                if (bankTitle.contains(config.lootTabName())) {
-                    return true;
+                if (bankTitle.contains(config.lootTabName()) && client.getWidget(ComponentID.BANK_ITEM_CONTAINER) != null) {
+                    //return true;
+                    return bankWidget.getId() == itemWidget.getWidget().getId();
                 }
                 return false;
             }
-        return true;
+        return false;
     }
 
     private Color getDesiredColor(EasyLootSellConfig.desiredHighlightColor value) {
