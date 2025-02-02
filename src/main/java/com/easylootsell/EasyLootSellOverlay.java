@@ -1,4 +1,5 @@
 package com.easylootsell;
+
 import net.runelite.api.Client;
 import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.Widget;
@@ -17,9 +18,9 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
     private final Client client;
     private final ItemManager itemManager;
     private final EasyLootSellConfig config;
+
     @Inject
-    public EasyLootSellOverlay(Client client, ItemManager itemManager, EasyLootSellPlugin plugin, EasyLootSellConfig config)
-    {
+    public EasyLootSellOverlay(final Client client, final ItemManager itemManager, final EasyLootSellConfig config) {
         this.client = client;
         this.itemManager = itemManager;
         this.config = config;
@@ -29,50 +30,34 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
     }
 
     @Override
-    public void renderItemOverlay(Graphics2D graphics, int itemId, WidgetItem itemWidget)
-    {
-        if (checkInterfaceIsHighlightable(itemWidget)) {
-            int qty = itemWidget.getQuantity();
-            /* highlight item if we have at least 1 in the loot tab for easy identification when selling */
-            if (qty >= 1)
-            {
+    public void renderItemOverlay(final Graphics2D graphics, final int itemId, final WidgetItem itemWidget) {
+        if (!interfaceIsHighlightable(itemWidget))
+            return;
 
-                Color colorToUse =  getDesiredColor(config.desiredHighlightColor());
-                Rectangle bounds = itemWidget.getCanvasBounds();
-                final BufferedImage outline = itemManager.getItemOutline(itemId, itemWidget.getQuantity(), colorToUse);
-                graphics.drawImage(outline, (int) bounds.getX(), (int) bounds.getY(), null);
-            }
-        }
+        final int qty = itemWidget.getQuantity();
+        if (qty < 1)
+            return;
+
+        // highlight item if we have at least 1 in the loot tab for easy identification when selling
+        final Color colorToUse = config.desiredHighlightColor().toJavaColor();
+        final Rectangle bounds = itemWidget.getCanvasBounds();
+        final BufferedImage outline = itemManager.getItemOutline(itemId, itemWidget.getQuantity(), colorToUse);
+        graphics.drawImage(outline, bounds.x, bounds.y, null);
     }
 
-    private boolean checkInterfaceIsHighlightable(WidgetItem itemWidget)
-    {
-            Widget bankWidget = client.getWidget(ComponentID.BANK_ITEM_CONTAINER);
-            if (bankWidget != null)
-            {
-                String bankTitle = client.getWidget(ComponentID.BANK_TITLE_BAR).getText();
-                /* if the item is within the desired tab, it should be highlighted */
+    private boolean interfaceIsHighlightable(final WidgetItem itemWidget) {
+        final Widget bankWidget = client.getWidget(ComponentID.BANK_ITEM_CONTAINER);
+        if (bankWidget == null)
+            return false;
 
-                if (bankTitle.contains(config.lootTabName()) && client.getWidget(ComponentID.BANK_ITEM_CONTAINER) != null) {
-                    //return true;
-                    return bankWidget.getId() == itemWidget.getWidget().getId();
-                }
-                return false;
-            }
-        return false;
+        final Widget bankTitleBarWidget = client.getWidget(ComponentID.BANK_TITLE_BAR);
+        if (bankTitleBarWidget == null)
+            return false;
+
+        final String bankTitle = bankTitleBarWidget.getText();
+        if (bankTitle == null || !bankTitle.contains(config.lootTabName()))
+            return false;
+
+        return bankWidget.getId() == itemWidget.getWidget().getId();
     }
-
-    private Color getDesiredColor(EasyLootSellConfig.desiredHighlightColor value) {
-        switch (value.toString()){
-            case "PINK":
-                return Color.PINK;
-            case "BLUE":
-                return Color.BLUE;
-            case "YELLOW":
-                return Color.YELLOW;
-            default:
-                return Color.GREEN;
-        }
-    }
-
 }

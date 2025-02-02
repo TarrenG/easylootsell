@@ -1,15 +1,10 @@
-
 package com.easylootsell;
 
-
 import com.google.inject.Provides;
-import net.runelite.api.Client;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.menus.MenuManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
-
 
 import javax.inject.Inject;
 
@@ -19,28 +14,15 @@ import javax.inject.Inject;
         tags = {"loot tab", "sell", "highlight", "loot", "prices", "deposit", "easy"}
 )
 public class EasyLootSellPlugin extends Plugin {
-    static final String CONFIG_GROUP = "easylootsell";
-
-    @Inject
-    private Client client;
-
-    @Inject
-    private ConfigManager configManager;
-
-    @Inject
-    private EasyLootSellConfig config;
-
-    @Inject
-    private MenuManager menuManager;
-
-    @Inject
-    private EasyLootSellOverlay overlay;
 
     @Inject
     private OverlayManager overlayManager;
 
+    @Inject
+    private EasyLootSellOverlay overlay;
+
     @Provides
-    EasyLootSellConfig provideConfig(ConfigManager configManager) {
+    EasyLootSellConfig provideConfig(final ConfigManager configManager) {
         return configManager.getConfig(EasyLootSellConfig.class);
     }
 
