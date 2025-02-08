@@ -7,6 +7,7 @@ public enum DesiredHighlightColor {
     BLUE,
     YELLOW,
     GREEN,
+    NONE,
     ;
 
     public Color toJavaColor() {

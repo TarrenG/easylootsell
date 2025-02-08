@@ -29,6 +29,10 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
 
     @Override
     public void renderItemOverlay(final Graphics2D graphics, final int itemId, final WidgetItem itemWidget) {
+        final DesiredHighlightColor desiredHighlightColor = config.desiredHighlightColor();
+        if (desiredHighlightColor == DesiredHighlightColor.NONE)
+            return;
+
         if (!interfaceIsHighlightable(itemWidget))
             return;
 
@@ -37,7 +41,7 @@ public class EasyLootSellOverlay extends WidgetItemOverlay {
             return;
 
         // highlight item if we have at least 1 in the loot tab for easy identification when selling
-        final Color colorToUse = config.desiredHighlightColor().toJavaColor();
+        final Color colorToUse = desiredHighlightColor.toJavaColor();
         final Rectangle bounds = itemWidget.getCanvasBounds();
         final BufferedImage outline = itemManager.getItemOutline(itemId, itemWidget.getQuantity(), colorToUse);
         graphics.drawImage(outline, bounds.x, bounds.y, null);
