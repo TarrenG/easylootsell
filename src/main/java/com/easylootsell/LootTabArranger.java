@@ -4,6 +4,7 @@ import lombok.NonNull;
 import net.runelite.api.Client;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.ScriptPostFired;
+import net.runelite.api.events.ScriptPreFired;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
@@ -68,6 +69,35 @@ public class LootTabArranger {
                 clientThread.invokeLater(bankSearch::layoutBank);
             }
         }
+    }
+
+    @Subscribe(priority = -2f) // "Bank Tags" and "Bank Tag Layouts" plugins also set the scroll bar height; run after them
+    public void onScriptPreFired(ScriptPreFired event) {
+        if (event.getScriptId() != ScriptID.BANKMAIN_FINISHBUILDING)
+            return;
+
+        setScrollBarIfApplicable();
+    }
+
+    private void setScrollBarIfApplicable() {
+        if (itemIdToIndex == null)
+            return;
+
+        if (WidgetUtils.getBankWidgetIfOnLootTab(client, config).isEmpty())
+            return;
+
+        final int scrollHeight = getYForIndex(findMaxIndex()) + BANK_ITEM_HEIGHT;
+
+        // Below technique taken from bank tag layouts
+        // This is prior to bankmain_finishbuilding running, so the arguments are still on the stack. Overwrite
+        // argument int12 (7 from the end) which is the height passed to if_setscrollsize
+        client.getIntStack()[client.getIntStackSize() - 7] = scrollHeight;
+    }
+
+    private int findMaxIndex() {
+        return itemIdToIndex.values().stream()
+                .max(Integer::compareTo)
+                .orElse(0);
     }
 
     @Subscribe
