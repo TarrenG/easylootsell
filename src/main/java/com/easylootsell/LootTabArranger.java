@@ -2,7 +2,6 @@ package com.easylootsell;
 
 import lombok.NonNull;
 import net.runelite.api.Client;
-import net.runelite.api.ItemComposition;
 import net.runelite.api.ScriptID;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.widgets.Widget;
@@ -13,17 +12,25 @@ import net.runelite.client.plugins.bank.BankSearch;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.easylootsell.EasyLootSellConfig.KEY_HIDE_PLACEHOLDERS;
 import static com.easylootsell.EasyLootSellConfig.KEY_HIDE_UNTRADABLES;
+import static com.easylootsell.EasyLootSellConfig.KEY_MOVE_UNTRADABLES_TO_LAST;
+import static net.runelite.client.plugins.banktags.BankTagsPlugin.BANK_ITEMS_PER_ROW;
+import static net.runelite.client.plugins.banktags.BankTagsPlugin.BANK_ITEM_HEIGHT;
+import static net.runelite.client.plugins.banktags.BankTagsPlugin.BANK_ITEM_START_X;
+import static net.runelite.client.plugins.banktags.BankTagsPlugin.BANK_ITEM_START_Y;
+import static net.runelite.client.plugins.banktags.BankTagsPlugin.BANK_ITEM_WIDTH;
+import static net.runelite.client.plugins.banktags.BankTagsPlugin.BANK_ITEM_X_PADDING;
+import static net.runelite.client.plugins.banktags.BankTagsPlugin.BANK_ITEM_Y_PADDING;
 
 @Singleton
 public class LootTabArranger {
-    private static final int BANK_ITEM_WIDTH = 36;
-
     @Inject
     private Client client;
 
@@ -49,7 +56,7 @@ public class LootTabArranger {
             return;
 
         final String key = event.getKey();
-        if (KEY_HIDE_PLACEHOLDERS.equals(key) || KEY_HIDE_UNTRADABLES.equals(key)) {
+        if (KEY_HIDE_PLACEHOLDERS.equals(key) || KEY_HIDE_UNTRADABLES.equals(key) || KEY_MOVE_UNTRADABLES_TO_LAST.equals(key)) {
             itemIdToIndex = null;
             if (config.hidePlaceholders() || config.hideUntradables()) {
                 clientThread.invokeLater(() -> {
@@ -107,14 +114,27 @@ public class LootTabArranger {
     @NonNull
     private Map<Integer, Integer> assignIndices(final Widget bankWidget) {
         final Map<Integer, Integer> map = new HashMap<>();
+        final List<Integer> untradables = new ArrayList<>();
 
         int index = 0;
         for (final Widget itemWidget : bankWidget.getDynamicChildren()) {
-            if (itemWidget.isHidden())
+            if (itemWidget.isHidden() || shouldHide(itemWidget))
                 continue;
 
-            if (!shouldHide(itemWidget)) {
-                map.put(itemWidget.getItemId(), index++);
+            final int itemId = itemWidget.getItemId();
+            final boolean tradable = client.getItemDefinition(itemId).isTradeable();
+            if (tradable || (!config.hideUntradables() && !config.moveUntradablesToLast())) {
+                map.put(itemId, index++);
+            } else {
+                untradables.add(itemId);
+            }
+        }
+
+        if (!config.hideUntradables() && config.moveUntradablesToLast()) {
+            index += 2 * BANK_ITEMS_PER_ROW - 1;
+            index -= index % BANK_ITEMS_PER_ROW;
+            for (final int itemId : untradables) {
+                map.put(itemId, index++);
             }
         }
 
@@ -135,10 +155,10 @@ public class LootTabArranger {
     }
 
     private static int getXForIndex(final int index) {
-        return (index % 8) * 48 + 51;
+        return (index % BANK_ITEMS_PER_ROW) * (BANK_ITEM_WIDTH + BANK_ITEM_X_PADDING) + BANK_ITEM_START_X;
     }
 
     private static int getYForIndex(final int index) {
-        return (index / 8) * BANK_ITEM_WIDTH;
+        return (index / BANK_ITEMS_PER_ROW) * (BANK_ITEM_HEIGHT + BANK_ITEM_Y_PADDING) + BANK_ITEM_START_Y;
     }
 }

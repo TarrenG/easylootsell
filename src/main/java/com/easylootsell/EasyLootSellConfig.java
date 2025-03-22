@@ -39,11 +39,11 @@ public interface EasyLootSellConfig extends Config {
     }
 
     @ConfigSection(
-            name = "Placeholder Hiding",
-            description = "Optionally hide placeholders to make grabbing loot even easier",
+            name = "Rearranging",
+            description = "Optionally hide placeholders and untradables to make grabbing loot even easier",
             position = 20
     )
-    String SECTION_ITEM_HIDING = "placeholderHidingSection";
+    String SECTION_ITEM_HIDING = "itemRearrangingSection";
 
     String KEY_HIDE_PLACEHOLDERS = "hidePlaceholders";
     @ConfigItem(
@@ -67,5 +67,17 @@ public interface EasyLootSellConfig extends Config {
     )
     default boolean hideUntradables() {
         return false;
+    }
+
+    String KEY_MOVE_UNTRADABLES_TO_LAST = "moveUntradablesToLast";
+    @ConfigItem(
+            keyName = KEY_MOVE_UNTRADABLES_TO_LAST,
+            name = "Move Untradables to last",
+            description = "Move untradables to the below all other items when hide placeholders is enabled and hide untradables is disabled",
+            position = 23,
+            section = SECTION_ITEM_HIDING
+    )
+    default boolean moveUntradablesToLast() {
+        return true;
     }
 }
