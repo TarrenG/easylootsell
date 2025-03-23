@@ -85,7 +85,7 @@ public class LootTabArranger {
     }
 
     @Subscribe(priority = -2f) // "Bank Tags" and "Bank Tag Layouts" plugins also set the scroll bar height; run after them
-    public void onScriptPreFired(ScriptPreFired event) {
+    public void onScriptPreFired(final ScriptPreFired event) {
         if (event.getScriptId() != ScriptID.BANKMAIN_FINISHBUILDING)
             return;
         setScrollBarIfApplicableOnBankBuild();
@@ -161,7 +161,7 @@ public class LootTabArranger {
     }
 
     private void arrangeLootTabIfApplicableClientThreadAssumed(final Set<Item> depositedItems) {
-        if (!config.hidePlaceholders() && !config.hideUntradables())
+        if (!config.hidePlaceholders() && !config.hideUntradables() && !config.moveUntradablesToLast())
             return;
 
         final Optional<Widget> bankWidgetIfOnLootTab = WidgetUtils.getBankWidgetIfOnLootTab(client, config);
@@ -216,7 +216,7 @@ public class LootTabArranger {
                 continue;
 
             final int itemId = itemWidget.getItemId();
-            final boolean tradable = client.getItemDefinition(itemId).isTradeable();
+            final boolean tradable = client.getItemDefinition(itemManager.canonicalize(itemId)).isTradeable();
             if (tradable || (!config.hideUntradables() && !config.moveUntradablesToLast())) {
                 map.put(itemId, index++);
             } else {
