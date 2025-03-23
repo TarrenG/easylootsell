@@ -2,22 +2,30 @@ package com.easylootsell;
 
 import lombok.NonNull;
 import net.runelite.api.Client;
+import net.runelite.api.InventoryID;
+import net.runelite.api.Item;
 import net.runelite.api.ScriptID;
+import net.runelite.api.events.ItemContainerChanged;
 import net.runelite.api.events.ScriptPostFired;
 import net.runelite.api.events.ScriptPreFired;
+import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.bank.BankSearch;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.easylootsell.EasyLootSellConfig.KEY_HIDE_PLACEHOLDERS;
 import static com.easylootsell.EasyLootSellConfig.KEY_HIDE_UNTRADABLES;
@@ -42,9 +50,14 @@ public class LootTabArranger {
     private ClientThread clientThread;
 
     @Inject
+    private ItemManager itemManager;
+
+    @Inject
     private BankSearch bankSearch;
 
     private Map<Integer, Integer> itemIdToIndex = null;
+    private Item[] previousInventory = new Item[0];
+    private int previousScrollHeight = Integer.MAX_VALUE;
 
     public void shutDown() {
         itemIdToIndex = null;
@@ -75,11 +88,46 @@ public class LootTabArranger {
     public void onScriptPreFired(ScriptPreFired event) {
         if (event.getScriptId() != ScriptID.BANKMAIN_FINISHBUILDING)
             return;
-
-        setScrollBarIfApplicable();
+        setScrollBarIfApplicableOnBankBuild();
     }
 
-    private void setScrollBarIfApplicable() {
+    @Subscribe
+    public void onScriptPostFired(final ScriptPostFired event) {
+        if (event.getScriptId() != ScriptID.BANKMAIN_BUILD)
+            return;
+        arrangeLootTabIfApplicableClientThreadAssumed();
+    }
+
+    @Subscribe
+    public void onItemContainerChanged(final ItemContainerChanged itemContainerChanged) {
+        if (InventoryID.INVENTORY.getId() != itemContainerChanged.getContainerId())
+            return;
+
+        final Item[] inventory = itemContainerChanged.getItemContainer().getItems();
+        // Recalc positions on deposits, but not withdrawals (the method '..IfApplicable' will cancel if it wasn't a bank interaction)
+        final Set<Item> depositedItems = findDepositedItems(inventory, previousInventory);
+        if (!depositedItems.isEmpty())
+            arrangeLootTabIfApplicable(depositedItems);
+
+        previousInventory = inventory;
+    }
+
+    private Set<Item> findDepositedItems(final Item[] inventory, final Item[] previousInventory) {
+        return Arrays.stream(previousInventory)
+                .filter(item -> item.getQuantity() > 0)
+                .filter(item -> quantityOfItem(inventory, item.getId()) < item.getQuantity())
+                .collect(Collectors.toSet());
+    }
+
+    private int quantityOfItem(final Item[] inventory, final int itemId) {
+        for (Item invItem : inventory) {
+            if (invItem.getId() == itemId)
+                return invItem.getQuantity();
+        }
+        return 0;
+    }
+
+    private void setScrollBarIfApplicableOnBankBuild() {
         if (itemIdToIndex == null)
             return;
 
@@ -100,18 +148,19 @@ public class LootTabArranger {
                 .orElse(0);
     }
 
-    @Subscribe
-    public void onScriptPostFired(final ScriptPostFired event) {
-        if (event.getScriptId() != ScriptID.BANKMAIN_BUILD)
-            return;
-        arrangeLootTabIfApplicableClientThreadAssumed();
+    public void arrangeLootTabIfApplicable() {
+        arrangeLootTabIfApplicable(Set.of());
     }
 
-    public void arrangeLootTabIfApplicable() {
-        clientThread.invokeLater(this::arrangeLootTabIfApplicableClientThreadAssumed);
+    public void arrangeLootTabIfApplicable(final Set<Item> depositedItems) {
+        clientThread.invokeLater(() -> arrangeLootTabIfApplicableClientThreadAssumed(depositedItems));
     }
 
     private void arrangeLootTabIfApplicableClientThreadAssumed() {
+        arrangeLootTabIfApplicableClientThreadAssumed(Set.of());
+    }
+
+    private void arrangeLootTabIfApplicableClientThreadAssumed(final Set<Item> depositedItems) {
         if (!config.hidePlaceholders() && !config.hideUntradables())
             return;
 
@@ -122,33 +171,48 @@ public class LootTabArranger {
         }
 
         final Widget bankWidget = bankWidgetIfOnLootTab.get();
-        if (itemIdToIndex == null)
-            itemIdToIndex = assignIndices(bankWidget);
+        if (itemIdToIndex == null || !depositedItems.isEmpty())
+            itemIdToIndex = assignIndices(bankWidget, depositedItems);
 
         for (final Widget itemWidget : bankWidget.getDynamicChildren()) {
-            if (itemWidget.isHidden())
-                continue;
-
             final Integer assignedIndex = itemIdToIndex.get(itemWidget.getItemId());
             if (assignedIndex == null) {
                 itemWidget.setHidden(true);
                 itemWidget.revalidate();
             } else {
+                itemWidget.setHidden(false);
                 itemWidget.setOriginalX(getXForIndex(assignedIndex));
                 itemWidget.setOriginalY(getYForIndex(assignedIndex));
                 itemWidget.revalidate();
             }
         }
+
+        previousScrollHeight = setScrollBarForRearrange(bankWidget);
+    }
+
+    private int setScrollBarForRearrange(final Widget bankWidget) {
+        final int scrollHeight = getYForIndex(findMaxIndex()) + BANK_ITEM_HEIGHT;
+
+        if (scrollHeight == previousScrollHeight || previousScrollHeight == Integer.MAX_VALUE)
+            return scrollHeight;
+
+        bankWidget.setScrollHeight(scrollHeight);
+        clientThread.invokeLater(() ->
+                client.runScript(ScriptID.UPDATE_SCROLLBAR, ComponentID.BANK_SCROLLBAR, ComponentID.BANK_ITEM_CONTAINER, bankWidget.getScrollY())
+        );
+
+         return scrollHeight;
     }
 
     @NonNull
-    private Map<Integer, Integer> assignIndices(final Widget bankWidget) {
+    private Map<Integer, Integer> assignIndices(final Widget bankWidget, final Set<Item> depositedItems) {
         final Map<Integer, Integer> map = new HashMap<>();
         final List<Integer> untradables = new ArrayList<>();
 
         int index = 0;
         for (final Widget itemWidget : bankWidget.getDynamicChildren()) {
-            if (itemWidget.isHidden() || shouldHide(itemWidget))
+            final boolean isDepositedItem = depositedItems.stream().anyMatch(deposited -> itemManager.canonicalize(deposited.getId()) == itemWidget.getItemId());
+            if (!isDepositedItem && (itemWidget.isHidden() || shouldHide(itemWidget)))
                 continue;
 
             final int itemId = itemWidget.getItemId();
